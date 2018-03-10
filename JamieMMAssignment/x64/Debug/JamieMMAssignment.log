@@ -1,0 +1,3 @@
+﻿  Main.cpp
+e:\school\mm\jamiemmassignment\main.cpp(145): warning C4477: 'printf' : format string '%I64u' requires an argument of type 'unsigned __int64', but variadic argument 1 has type 'RakNet::RakNetGUID'
+RakNet_VS2008_LibStatic_Debug_Win32.lib(BitStream.obj) : fatal error LNK1112: module machine type 'x86' conflicts with target machine type 'x64'
