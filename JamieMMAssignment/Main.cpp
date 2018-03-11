@@ -166,7 +166,7 @@ void DisplayActivePlayer(RakNet::Packet* packet)
 	bs.Read(messageId);
 	RakNet::RakString userName;
 	bs.Read(userName);
-	if(userName.C_String() == "Mine")
+	if (userName.C_String() == "Mine")
 	{
 		std::cout << "It is your Turn." << std::endl;
 
@@ -175,7 +175,7 @@ void DisplayActivePlayer(RakNet::Packet* packet)
 		g_networkState_mutex.unlock();
 
 		RakNet::BitStream bsWrite;
-		bsWrite.Write((RakNet::MessageID)ID_WHOTOATTACK);
+		bsWrite.Write((RakNet::MessageID)ID_THEGAME_START);
 		RakNet::RakString possibleTargets("toAttack");
 		bsWrite.Write(possibleTargets);
 
@@ -194,7 +194,7 @@ void DisplayWinner(RakNet::Packet* packet)
 	RakNet::RakString userName;
 	bs.Read(userName);
 
-	std::cout <<  userName.C_String() << " wins." << std::endl;
+	std::cout << userName.C_String() << " wins." << std::endl;
 	std::cout << "Game Over" << std::endl;
 
 	g_networkState_mutex.lock();
@@ -230,7 +230,7 @@ void OnLobbyReady(RakNet::Packet* packet)
 	}
 
 	player.SendName(packet->systemAddress, true);
-	
+
 
 }
 
@@ -311,7 +311,7 @@ void PlayerCharacterSelect(RakNet::Packet* packet)
 
 	}
 
-	if (m_players.size() >= 2 && peopleReady == m_players.size()) 
+	if (m_players.size() >= 2 && peopleReady == m_players.size())
 	{
 
 		RakNet::BitStream bsWrite;
@@ -320,8 +320,8 @@ void PlayerCharacterSelect(RakNet::Packet* packet)
 		bsWrite.Write(StartGame);
 
 		//tells all client to print game is starting
-			assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, true));
-			assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false));
+		assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, true));
+		assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false));
 
 	}
 }
@@ -329,18 +329,18 @@ void PlayerCharacterSelect(RakNet::Packet* packet)
 void StartGame(RakNet::Packet* packet)
 {
 
-		std::cout << "Game is Starting now" << std::endl;
-		g_networkState_mutex.lock();
-		g_networkState = NS_InGame;
-		g_networkState_mutex.unlock();
+	std::cout << "Game is Starting now" << std::endl;
+	g_networkState_mutex.lock();
+	g_networkState = NS_InGame;
+	g_networkState_mutex.unlock();
 
-		RakNet::BitStream bs;
-		bs.Write((RakNet::MessageID)ID_THEGAME_START);
-		RakNet::RakString playerturn("Turn");
-		bs.Write(playerturn);
+	RakNet::BitStream bs;
+	bs.Write((RakNet::MessageID)ID_THEGAME_START);
+	RakNet::RakString playerturn("Turn");
+	bs.Write(playerturn);
 
-		assert(g_rakPeerInterface->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, g_serverAddress, false));
-	
+	assert(g_rakPeerInterface->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, g_serverAddress, false));
+
 }
 
 void GetPlayerAlive(RakNet::Packet* packet)
@@ -350,8 +350,11 @@ void GetPlayerAlive(RakNet::Packet* packet)
 	bs.Read(messageId);
 	RakNet::RakString playerAlive;
 	bs.Read(playerAlive);
+	RakNet::RakString playerHealth;
+	bs.Read(playerHealth);
 
-	std::cout << "There are " << playerAlive.C_String() << " Alive still." <<std::endl;
+
+	printf("%s has %s health left.\n", playerAlive.C_String(), playerHealth.C_String());
 }
 
 unsigned char GetPacketIdentifier(RakNet::Packet *packet)
@@ -367,6 +370,19 @@ unsigned char GetPacketIdentifier(RakNet::Packet *packet)
 	else
 		return (unsigned char)packet->data[0];
 }
+
+void Targets(RakNet::Packet* packet)
+{
+	RakNet::BitStream bs(packet->data, packet->length, false);
+	RakNet::MessageID messageId;
+	bs.Read(messageId);
+	RakNet::RakString attackTarget;
+	bs.Read(attackTarget);
+
+	printf("you can attack %s.\n", attackTarget.C_String());
+
+}
+
 void AttackedTarget(RakNet::Packet* packet)
 {
 	RakNet::BitStream bs;
@@ -384,9 +400,13 @@ void AttackedTarget(RakNet::Packet* packet)
 			player.m_health -= 10;
 			RakNet::BitStream bsWrite;
 			bsWrite.Write((RakNet::MessageID)ID_PLAYERTARGET);
-			RakNet::RakString targetName("wasAttacked");
+			RakNet::RakString targetName(attacker.m_name.c_str());
 			bsWrite.Write(targetName);
-			assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, player.address, false));
+			RakNet::RakString playerName(player.m_name.c_str());
+			bsWrite.Write(playerName);
+			RakNet::RakString damageDone(std::to_string(10).c_str());
+			bsWrite.Write(damageDone);
+			assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, true));
 			break;
 		}
 	}
@@ -400,7 +420,7 @@ void GameManager(RakNet::Packet* packet)
 	bs.Read(messageId);
 	RakNet::RakString whatToDo;
 	bs.Read(whatToDo);
-	
+
 	int peopleAlive = 0;
 
 	for (std::map<unsigned long, SPlayer>::iterator it = m_players.begin(); it != m_players.end(); ++it)
@@ -416,7 +436,7 @@ void GameManager(RakNet::Packet* packet)
 	RakNet::BitStream bsWrite;
 	if (whatToDo == "Turn")
 	{
-		
+
 		for (std::map<unsigned long, SPlayer>::iterator it = m_players.begin(); it != m_players.end(); ++it)
 		{
 			SPlayer& player = it->second;
@@ -441,27 +461,46 @@ void GameManager(RakNet::Packet* packet)
 				break;
 			}
 		}
-		
-		
+
+
 	}
 	else if (whatToDo == "stats")
 	{
-		int peopleAlive = 0;
+
 
 		for (std::map<unsigned long, SPlayer>::iterator it = m_players.begin(); it != m_players.end(); ++it)
 		{
-			
+
 			SPlayer& player = it->second;
 			if (player.m_health >= 0)
-				peopleAlive++;
+			{
+				bsWrite.Write((RakNet::MessageID)ID_PLAYERSTATS);
+				RakNet::RakString playerName(player.m_name.c_str());
+				bsWrite.Write(playerName);
+				RakNet::RakString playerHealth(std::to_string(player.m_health).c_str());
+				bsWrite.Write(playerHealth);
+				assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false));
+			}
 
 		}
 
-		bsWrite.Write((RakNet::MessageID)ID_PLAYERSTATS);
-		RakNet::RakString playersAlive(std::to_string(peopleAlive).c_str());
-		bsWrite.Write(playersAlive);
+	}
+	else if (whatToDo == "toAttack")
+	{
 
-		assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false));
+		for (std::map<unsigned long, SPlayer>::iterator it = m_players.begin(); it != m_players.end(); ++it)
+		{
+
+			SPlayer& player = it->second;
+			if (player.m_health >= 0)
+			{
+				bsWrite.Write((RakNet::MessageID)ID_WHOTOATTACK);
+				RakNet::RakString playerName(player.m_name.c_str());
+				bsWrite.Write(playerName);
+				assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false));
+			}
+
+		}
 	}
 
 	//End Condition
@@ -517,7 +556,7 @@ void InputHandler()
 		else if (g_networkState == NS_CharacterSelect)
 		{
 			std::cout << "Pick a your class. Mage, Rogue, Cleric" << std::endl;
-				std::cin >> userInput;
+			std::cin >> userInput;
 
 			RakNet::BitStream bs;
 			bs.Write((RakNet::MessageID)ID_PLAYER_CHARACTER);
@@ -548,7 +587,7 @@ void InputHandler()
 			bsWrite.Write(Target);
 
 			assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, g_serverAddress, false));
-				
+
 		}
 		else if (g_networkState == NS_PlayerTurn)
 		{
@@ -669,7 +708,7 @@ void PacketHandler()
 					GetPlayerAlive(packet);
 					break;
 				case ID_WHOTOATTACK:
-
+					Targets(packet);
 					break;
 				case ID_THEGAME_START:
 					GameManager(packet);
@@ -737,10 +776,7 @@ int main()
 
 			}
 		}
-		if (g_networkState = NS_GameOver)
-		{
-			break;
-		}
+
 	}
 
 	//std::cout << "press q and then return to exit" << std::endl;
