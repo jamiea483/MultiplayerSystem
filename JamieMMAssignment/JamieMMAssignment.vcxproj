@@ -70,8 +70,8 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <OutDir>$(SolutionDir)Temp\$(Configuration)\</OutDir>
-    <IntDir>$(Solution)Game\$(Configuration)\</IntDir>
+    <OutDir>$(SolutionDir)Game\$(Configuration)\</OutDir>
+    <IntDir>$(Solution)Temp\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)Temp\$(Configuration)\</OutDir>
