@@ -48,6 +48,7 @@ enum {
 	ID_THEGAME_START,
 	ID_PLAYERTARGET,
 	ID_WHOS_TURN,
+	ID_ATTACK,
 	ID_WHOTO_ATTACK,
 	ID_PLAYERSTATS,
 	ID_WINNER,
@@ -64,7 +65,6 @@ struct SPlayer
 {
 	std::string m_name;
 	unsigned int m_health;
-	unsigned int m_strength;
 	unsigned int m_defence;
 	unsigned int m_turn;
 	EPlayerClass m_class;
@@ -116,6 +116,35 @@ struct SPlayer
 		
 		//returns 0 when something is wrong
 		assert(g_rakPeerInterface->Send(&writeBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, systemAddress, isBroadcast));
+	}
+
+	void SendNameAttacked(RakNet::SystemAddress systemAddress, RakNet::RakString attacker, int damage, bool isBroadcast)
+	{
+		RakNet::BitStream bsWrite;
+		bsWrite.Write((RakNet::MessageID)ID_PLAYERTARGET);
+		RakNet::RakString action("Attack");
+		bsWrite.Write(action);
+		RakNet::RakString playerName(attacker);
+		bsWrite.Write(playerName);
+		RakNet::RakString targetName(m_name.c_str());
+		bsWrite.Write(targetName);
+
+		if (damage < 0)
+		{
+			RakNet::RakString damageDone(std::to_string(0).c_str());
+			bsWrite.Write(damageDone);
+		}
+		else
+		{
+			RakNet::RakString damageDone(std::to_string(damage).c_str());
+			bsWrite.Write(damageDone);
+		}
+
+		printf("stuct");
+		printf("%s - attacked player \n", m_name.c_str());
+		printf("%s - player attacking \n", attacker.C_String());
+		//returns 0 when something is wrong
+		assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, systemAddress, isBroadcast));
 	}
 };
 
@@ -257,7 +286,6 @@ void PlayerCharacterSelect(RakNet::Packet* packet)
 	{
 		printf("%s is a mage\n",player.m_name.c_str() );
 		player.m_class = Mage;
-		player.m_strength = rand() % 15 + 10;
 		player.m_defence = rand() % 9 + 5;
 		player.m_health = 100;
 		player.m_turn = 0;
@@ -271,7 +299,6 @@ void PlayerCharacterSelect(RakNet::Packet* packet)
 	{
 		printf("%s is a Rogue\n", player.m_name.c_str());
 		player.m_class = Rogue;
-		player.m_strength = rand() % 15 + 10;
 		player.m_defence = rand() % 9 + 5;
 		player.m_health = 100;
 		player.m_turn = 0;
@@ -285,8 +312,7 @@ void PlayerCharacterSelect(RakNet::Packet* packet)
 	{
 		printf("%s is a Cleric\n", player.m_name.c_str());
 		player.m_class = Cleric;
-		player.m_strength = 10;
-		player.m_defence = rand() % 9 + 5;
+		player.m_defence = rand() % 10 + 8;
 		player.m_health = 100;
 		player.m_turn = 0;
 		player.m_address = packet->systemAddress;
@@ -314,6 +340,8 @@ void PlayerReadyToStartGame(RakNet::Packet* packet)
 	RakNet::RakString Ready;
 	readBs.Read(Ready);
 
+	int peopleReady = 0;
+
 	if (Ready == "yes" || Ready == "Yes")
 	{
 		unsigned long guid = RakNet::RakNetGUID::ToUint32(packet->guid);
@@ -340,7 +368,7 @@ void PlayerReadyToStartGame(RakNet::Packet* packet)
 		assert(g_rakPeerInterface->Send(&writeBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false));
 	}
 
-	int peopleReady = 0;
+	
 
 	for (auto it : m_players)
 	{
@@ -351,6 +379,10 @@ void PlayerReadyToStartGame(RakNet::Packet* packet)
 	}
 	if (peopleReady >= 3)
 	{
+		g_networkState_mutex.lock();
+		g_networkState = NS_InGame;
+		g_networkState_mutex.unlock();
+
 		RakNet::BitStream writeBs;
 		writeBs.Write((RakNet::MessageID)ID_CANSTART_GAME);
 		assert(g_rakPeerInterface->Send(&writeBs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, true));
@@ -431,69 +463,74 @@ void PlayerHasAttack(RakNet::Packet* packet)
 	bs.Read(damageToPlayer);
 
 	if (action == "Attack")
-		printf("%s was attacked by %s and lost %s health.\n", targetPlayer.C_String(), attackingPlayer.C_String(), damageToPlayer.C_String());
+	{
+		printf("%s was attacked by %s and lost %s health.\n", attackingPlayer.C_String(), targetPlayer.C_String(), damageToPlayer.C_String());
+	
+		RakNet::BitStream bs;
+		bs.Write((RakNet::MessageID)ID_THEGAME_START);
+		RakNet::RakString playerturn("Turn");
+		bs.Write(playerturn);
+
+		g_networkState_mutex.lock();
+		g_networkState = NS_Pending;
+		g_networkState_mutex.unlock();
+
+		assert(g_rakPeerInterface->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, g_serverAddress, false));
+	}
 	else if (action == "invaild")
+	{
 		printf("inVaild Target. Try Again. \n");
+		g_networkState_mutex.lock();
+		g_networkState = NS_PlayerTurn;
+		g_networkState_mutex.unlock();
+	}
 
 }
 
 void AttackedTarget(RakNet::Packet* packet)
 {
-	RakNet::BitStream bs;
+	RakNet::BitStream bs(packet->data, packet->length, false);
 	RakNet::MessageID messageId;
 	bs.Read(messageId);
 	RakNet::RakString Target;
 	bs.Read(Target);
 
 	SPlayer& attacker = GetPlayer(packet->guid);
-	SPlayer& targetPlayer = GetPlayer(packet->guid);
 	bool vaild = false;
-
+	
+	printf("function");
 	//makes sure the target is a vaild target 
-	printf("%s. \n", Target);
+	printf("%s - attacked player. \n", Target.C_String());
 	for (auto it : m_players)
 	{
-		targetPlayer = it.second;
+		SPlayer& targetPlayer = it.second;
 
 		if (Target == targetPlayer.m_name.c_str())
 		{
+			attacker.m_turn++;
+			int damage = (rand() % 15 + 10) - targetPlayer.m_defence;
+			if (damage > 0)
+				targetPlayer.m_health -= damage;
+
+			targetPlayer.SendNameAttacked(packet->systemAddress, attacker.m_name.c_str(), damage, true);
+			targetPlayer.SendNameAttacked(packet->systemAddress, attacker.m_name.c_str(), damage, false);
 			vaild = true;
-			printf("Vaild target.");
 			break;
 		}
 
 	}
 
-	if (vaild)
-	{
-		attacker.m_turn++;
-
-		targetPlayer.m_health -= 10;
-		RakNet::BitStream bsWrite;
-		bsWrite.Write((RakNet::MessageID)ID_PLAYERTARGET);
-		RakNet::RakString action("Attack");
-		bsWrite.Write(action);
-		RakNet::RakString targetName(targetPlayer.m_name.c_str());
-		bsWrite.Write(targetName);
-		RakNet::RakString playerName(attacker.m_name.c_str());
-		bsWrite.Write(playerName);
-		RakNet::RakString damageDone(std::to_string(10).c_str());
-		bsWrite.Write(damageDone);
-		assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, true));
-	}
-	else
+	if (!vaild)
 	{
 		printf("Invaild");
 
-		targetPlayer.m_health -= 10;
 		RakNet::BitStream bsWrite;
 		bsWrite.Write((RakNet::MessageID)ID_PLAYERTARGET);
 		RakNet::RakString action("invaild");
 		bsWrite.Write(action);
-		RakNet::RakString targetName(targetPlayer.m_name.c_str());
-		bsWrite.Write(targetName);
 
 		assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false));
+
 	}
 }
 
@@ -536,51 +573,39 @@ void GameManager(RakNet::Packet* packet)
 	RakNet::BitStream bsWrite;
 	if (whatToDo == "Turn")
 	{
-
-		for (auto it : m_players)
+		bool findingPlayer = false;
+		while (!findingPlayer)
 		{
+			for (auto it : m_players)
+			{
 
-			SPlayer& player = it.second;
-			/*	if (player.m_activePlayer)
-			{
-			if (player.address == packet->systemAddress)
-			{
-			bsWrite.Write((RakNet::MessageID)ID_WHOS_TURN);
-			RakNet::RakString name("Mine");
-			bsWrite.Write(name);
-			assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false));
-			}
-			else
-			{
-			bsWrite.Write((RakNet::MessageID)ID_WHOS_TURN);
-			RakNet::RakString name(player.m_name.c_str());
-			bsWrite.Write(name);
-			assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false));
-			}
-			break;
-			}*/
+				SPlayer& player = it.second;
 
-			if (player.m_turn <= g_currentTurn)
-			{
-				SPlayer callingPlayer = GetPlayer(packet->guid);
-				if (player.m_address == packet->systemAddress)
+				if (player.m_turn <= g_currentTurn)
 				{
-					bsWrite.Write((RakNet::MessageID)ID_WHOS_TURN);
-					RakNet::RakString name("Mine");
-					bsWrite.Write(name);
-					assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false));
+					SPlayer callingPlayer = GetPlayer(packet->guid);
+					if (player.m_address == packet->systemAddress)
+					{
+						bsWrite.Write((RakNet::MessageID)ID_WHOS_TURN);
+						RakNet::RakString name("Mine");
+						bsWrite.Write(name);
+						assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false));
+					}
+					else
+					{
+						bsWrite.Write((RakNet::MessageID)ID_WHOS_TURN);
+						RakNet::RakString name(player.m_name.c_str());
+						bsWrite.Write(name);
+						assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false));
+					}
+					findingPlayer = true;
+					break;
+					
 				}
-				else
-				{
-					bsWrite.Write((RakNet::MessageID)ID_WHOS_TURN);
-					RakNet::RakString name(player.m_name.c_str());
-					bsWrite.Write(name);
-					assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, packet->systemAddress, false));
-				}
-				break;
 			}
+			if (!findingPlayer)
+				g_currentTurn++;
 		}
-
 
 	}
 	else if (whatToDo == "stats")
@@ -723,7 +748,7 @@ void InputHandler()
 		}
 		else if (g_networkState == NS_InGame)
 		{
-			std::cout << "you can type stats." << std::endl;
+			std::cout << "you can type stats to check the stats of player alive." << std::endl;
 			std::cin >> userInput;
 
 			RakNet::BitStream bsWrite;
@@ -732,6 +757,21 @@ void InputHandler()
 			bsWrite.Write(Target);
 
 			assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, g_serverAddress, false));
+		}
+		else if (g_networkState == NS_PlayerTurn)
+		{
+			std::cin >> userInput;
+
+			RakNet::BitStream bs;
+			bs.Write((RakNet::MessageID)ID_ATTACK);
+			RakNet::RakString target(userInput);
+			bs.Write(target);
+
+			assert(g_rakPeerInterface->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, g_serverAddress, false));
+
+			g_networkState_mutex.lock();
+			g_networkState = NS_Pending;
+			g_networkState_mutex.unlock();
 		}
 		else if (g_networkState == NS_Pending)
 		{
@@ -869,6 +909,12 @@ void PacketHandler()
 					break;
 				case ID_PLAYERSTATS:
 					DisplayStats(packet);
+					break;
+				case ID_ATTACK:
+					AttackedTarget(packet);
+					break;
+				case ID_PLAYERTARGET:
+					PlayerHasAttack(packet);
 					break;
 				default:
 					break;
