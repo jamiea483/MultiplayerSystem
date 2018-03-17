@@ -690,7 +690,7 @@ unsigned char GetPacketIdentifier(RakNet::Packet *packet)
 
 void InputHandler()
 {
-	assert(!isServer);
+	
 	while (isRunning)
 	{
 		char userInput[255];
@@ -756,15 +756,18 @@ void InputHandler()
 		}
 		else if (g_networkState == NS_InGame)
 		{
-			std::cout << "you can type stats to check the stats of player alive." << std::endl;
-			std::cin >> userInput;
+			if (!isServer)
+			{
+				std::cout << "you can type stats to check the stats of player alive." << std::endl;
+				std::cin >> userInput;
 
-			RakNet::BitStream bsWrite;
-			bsWrite.Write((RakNet::MessageID)ID_THEGAME_START);
-			RakNet::RakString Target(userInput);
-			bsWrite.Write(Target);
+				RakNet::BitStream bsWrite;
+				bsWrite.Write((RakNet::MessageID)ID_THEGAME_START);
+				RakNet::RakString Target(userInput);
+				bsWrite.Write(Target);
 
-			assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, g_serverAddress, false));
+				assert(g_rakPeerInterface->Send(&bsWrite, HIGH_PRIORITY, RELIABLE_ORDERED, 0, g_serverAddress, false));
+			}
 		}
 		else if (g_networkState == NS_PlayerTurn)
 		{
@@ -937,8 +940,9 @@ void PacketHandler()
 int main()
 {
 	g_rakPeerInterface = RakNet::RakPeerInterface::GetInstance();
-
+	
 	std::thread inputHandler(InputHandler);
+
 	std::thread packetHandler(PacketHandler);
 
 	while (isRunning)
