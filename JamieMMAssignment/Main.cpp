@@ -140,7 +140,7 @@ struct SPlayer
 			bsWrite.Write(damageDone);
 		}
 
-		printf("stuct");
+		printf("struct\n");
 		printf("%s - attacked player \n", m_name.c_str());
 		printf("%s - player attacking \n", attacker.C_String());
 		//returns 0 when something is wrong
@@ -450,17 +450,17 @@ void Targets(RakNet::Packet* packet)
 //Display who was attack and the damage done that that player.
 void PlayerHasAttack(RakNet::Packet* packet)
 {
-	RakNet::BitStream bs(packet->data, packet->length, false);
+	RakNet::BitStream bsRead(packet->data, packet->length, false);
 	RakNet::MessageID messageId;
-	bs.Read(messageId);
+	bsRead.Read(messageId);
 	RakNet::RakString action;
-	bs.Read(action);
+	bsRead.Read(action);
 	RakNet::RakString targetPlayer;
-	bs.Read(targetPlayer);
+	bsRead.Read(targetPlayer);
 	RakNet::RakString attackingPlayer;
-	bs.Read(attackingPlayer);
+	bsRead.Read(attackingPlayer);
 	RakNet::RakString damageToPlayer;
-	bs.Read(damageToPlayer);
+	bsRead.Read(damageToPlayer);
 
 	if (action == "Attack")
 	{
@@ -497,8 +497,9 @@ void AttackedTarget(RakNet::Packet* packet)
 
 	SPlayer& attacker = GetPlayer(packet->guid);
 	bool vaild = false;
-	
-	printf("function");
+	int damage = 0;
+
+	printf("function\n");
 	//makes sure the target is a vaild target 
 	printf("%s - attacked player. \n", Target.C_String());
 	for (auto it : m_players)
@@ -508,10 +509,16 @@ void AttackedTarget(RakNet::Packet* packet)
 		if (Target == targetPlayer.m_name.c_str())
 		{
 			attacker.m_turn++;
-			int damage = (rand() % 15 + 10) - targetPlayer.m_defence;
-			if (damage > 0)
-				targetPlayer.m_health -= damage;
+			damage = (rand() % 15 + 10) - targetPlayer.m_defence;
+			if (damage <= 0)
+			{
+				damage = 0;
+			
+			}
+			unsigned int health = targetPlayer.m_health -= damage;
+			targetPlayer.m_health = health;
 
+			printf("%s %s Health \n", targetPlayer.m_name.c_str(), std::to_string(targetPlayer.m_health).c_str());
 			targetPlayer.SendNameAttacked(packet->systemAddress, attacker.m_name.c_str(), damage, true);
 			targetPlayer.SendNameAttacked(packet->systemAddress, attacker.m_name.c_str(), damage, false);
 			vaild = true;
@@ -683,6 +690,7 @@ unsigned char GetPacketIdentifier(RakNet::Packet *packet)
 
 void InputHandler()
 {
+	assert(!isServer);
 	while (isRunning)
 	{
 		char userInput[255];

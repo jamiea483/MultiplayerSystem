@@ -1,4 +1,4 @@
 ﻿  Main.cpp
-c:\users\jamie\desktop\engine\multiplayersystem\jamiemmassignment\main.cpp(580): warning C4018: '<=': signed/unsigned mismatch
-c:\users\jamie\desktop\engine\multiplayersystem\jamiemmassignment\main.cpp(799): warning C4477: 'printf' : format string '%I64u' requires an argument of type 'unsigned __int64', but variadic argument 1 has type 'RakNet::RakNetGUID'
+c:\users\jamie\desktop\engine\multiplayersystem\jamiemmassignment\main.cpp(592): warning C4018: '<=': signed/unsigned mismatch
+c:\users\jamie\desktop\engine\multiplayersystem\jamiemmassignment\main.cpp(812): warning C4477: 'printf' : format string '%I64u' requires an argument of type 'unsigned __int64', but variadic argument 1 has type 'RakNet::RakNetGUID'
   JamieMMAssignment.vcxproj -> C:\Users\jamie\Desktop\Engine\MultiplayerSystem\JamieMMAssignment\Game\Debug\JamieMMAssignment.exe
