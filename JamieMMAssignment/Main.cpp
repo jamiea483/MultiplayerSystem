@@ -69,7 +69,7 @@ struct SPlayer
 	unsigned int m_turn;
 	EPlayerClass m_class;
 	bool m_isReady = false;
-	RakNet::SystemAddress m_address;
+	RakNet::RakNetGUID m_address;
 
 
 	//function to send a packet with name/health/class etc
@@ -289,7 +289,7 @@ void PlayerCharacterSelect(RakNet::Packet* packet)
 		player.m_defence = rand() % 9 + 5;
 		player.m_health = 100;
 		player.m_turn = 0;
-		player.m_address = packet->systemAddress;
+		player.m_address = packet->guid;
 
 		RakNet::BitStream writeBs;
 		writeBs.Write((RakNet::MessageID)ID_CANREADYUP);
@@ -302,7 +302,7 @@ void PlayerCharacterSelect(RakNet::Packet* packet)
 		player.m_defence = rand() % 9 + 5;
 		player.m_health = 100;
 		player.m_turn = 0;
-		player.m_address = packet->systemAddress;
+		player.m_address = packet->guid;
 
 		RakNet::BitStream writeBs;
 		writeBs.Write((RakNet::MessageID)ID_CANREADYUP);
@@ -315,7 +315,7 @@ void PlayerCharacterSelect(RakNet::Packet* packet)
 		player.m_defence = rand() % 10 + 8;
 		player.m_health = 100;
 		player.m_turn = 0;
-		player.m_address = packet->systemAddress;
+		player.m_address = packet->guid;
 
 		RakNet::BitStream writeBs;
 		writeBs.Write((RakNet::MessageID)ID_CANREADYUP);
@@ -504,7 +504,7 @@ void AttackedTarget(RakNet::Packet* packet)
 	printf("%s - attacked player. \n", Target.C_String());
 	for (auto it : m_players)
 	{
-		SPlayer& targetPlayer = it.second;
+		SPlayer& targetPlayer = GetPlayer(it.second.m_address);
 
 		if (Target == targetPlayer.m_name.c_str())
 		{
@@ -591,7 +591,7 @@ void GameManager(RakNet::Packet* packet)
 				if (player.m_turn <= g_currentTurn)
 				{
 					SPlayer callingPlayer = GetPlayer(packet->guid);
-					if (player.m_address == packet->systemAddress)
+					if (player.m_address == packet->guid)
 					{
 						bsWrite.Write((RakNet::MessageID)ID_WHOS_TURN);
 						RakNet::RakString name("Mine");
