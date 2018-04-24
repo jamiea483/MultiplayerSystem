@@ -20,7 +20,7 @@ public class Health : NetworkBehaviour {
 	{
 		if (isLocalPlayer)
 		{
-			spawnPoints = FindObjectOfType<NetworkStartPosition> ();
+			spawnPoints = FindObjectsOfType<NetworkStartPosition> ();
 		}
 	}
 
